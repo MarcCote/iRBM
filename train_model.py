@@ -12,7 +12,7 @@ import iRBM.training.tasks as tasks
 
 from iRBM.misc import utils
 from iRBM.misc import dataset
-from iRBM.models import model_factory
+from iRBM.models import model_factory, irbm
 
 from iRBM.misc.utils import Timer
 
@@ -194,7 +194,7 @@ def main():
         trainer.add_task(tasks.Print(avg_reconstruction_error, msg="Avg. reconstruction error: {0:.1f}"))
 
         if args.model == 'irbm':
-            trainer.add_task(tasks.GrowiRBM(model))
+            trainer.add_task(irbm.GrowiRBM(model))
 
         # Save training progression
         trainer.add_task(tasks.SaveProgression(model, experiment_path))
