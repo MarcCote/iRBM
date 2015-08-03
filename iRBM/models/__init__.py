@@ -31,7 +31,7 @@ def model_factory(model_name, input_size, hyperparams):
         lambda_factor = float(hyperparams["L1Regularization"])
         regularization_method = L1Regularization(lambda_factor)
     elif hyperparams["L2Regularization"] is not None:
-        lambda_factor = float(hyperparams["L1Regularization"])
+        lambda_factor = float(hyperparams["L2Regularization"])
         regularization_method = L2Regularization(lambda_factor)
 
     #Set contrastive divergence method to use.

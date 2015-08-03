@@ -2,6 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
+
+# Hack so you don't have to put the library containing this  script in the PYTHONPATH.
+sys.path = [os.path.abspath(os.path.join(__file__, '..', '..'))] + sys.path
+
+import os
 from os.path import join as pjoin
 import argparse
 import shutil
@@ -112,8 +118,8 @@ def buildArgsParser():
     # Regularization choices
     update_rules = p.add_argument_group("Regularization (optional)")
     update_rules = update_rules.add_mutually_exclusive_group(required=False)
-    update_rules.add_argument('--L1Regularization', metavar="LAMBDA", type=str, help='use L1 regularization to train model.')
-    update_rules.add_argument('--L2Regularization', metavar="LAMBDA", type=str, help='use L2 regularization to train model.')
+    update_rules.add_argument('--L1Regularization', metavar="LAMBDA", type=float, help='use L1 regularization to train model.')
+    update_rules.add_argument('--L2Regularization', metavar="LAMBDA", type=float, help='use L2 regularization to train model.')
 
     # General options (optional)
     general = p.add_argument_group("General arguments")
