@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
+
+# Hack so you don't have to put the library containing this  script in the PYTHONPATH.
+sys.path = [os.path.abspath(os.path.join(__file__, '..', '..'))] + sys.path
+
 import numpy as np
 from os.path import join as pjoin
 import argparse
