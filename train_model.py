@@ -107,6 +107,8 @@ def buildArgsParser():
     training = p.add_argument_group("Training arguments")
     training.add_argument('--batch-size', type=int, metavar="M",
                           help='size of the batch to use when training the model. Default: 100.', default=100)
+    training.add_argument('--dataset-percent', type=float, metavar="X",
+                          help='percent of train data used for training. (Value between 0 and 1)', default=1.)
 
     # Update rule choices
     update_rules = p.add_argument_group("Update Rules (required)")
@@ -172,7 +174,8 @@ def main():
         utils.save_dict_to_json_file(pjoin(experiment_path, "hyperparams.json"), hyperparams)
 
     with Timer("Loading dataset"):
-        trainset, validset, testset = dataset.load(args.dataset)
+        trainset, validset, testset = dataset.load(args.dataset, args.dataset_percent)
+        print " (data: {:,}; {:,}; {:,}) ".format(len(trainset), len(validset), len(testset)),
 
     with Timer("\nCreating model"):
         model = model_factory(args.model, input_size=trainset.input_size, hyperparams=hyperparams)
