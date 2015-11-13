@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 
+import theano
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from iRBM.misc.learning_rate import ConstantLearningRate
@@ -60,4 +61,7 @@ class Model():
 
     @classmethod
     def load(self, filename):
+        if theano.config.device == "cpu":
+            theano.config.experimental.unpickle_gpu_on_cpu = True
+
         return pickle.load(open(filename, 'r'))
