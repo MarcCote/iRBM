@@ -60,6 +60,8 @@ def buildArgsParser():
     lnZ.add_argument('--lnZ', metavar=("lnZ", "lnZ_down", "lnZ_up"), type=float, nargs=3,
                      help='use this information (i.e. lnZ lnZ_down lnZ_up) about the partition function instead of approximating it with AIS.')
 
+    p.add_argument('-f', '--force', action='store_true', help='Overwrite existing `result.json`')
+
     return p
 
 
@@ -118,6 +120,17 @@ def main():
     print "Avg. NLL on trainset: {:.2f} ± {:.2f}".format(NLL_train.avg, NLL_train.stderr)
     print "Avg. NLL on validset: {:.2f} ± {:.2f}".format(NLL_valid.avg, NLL_valid.stderr)
     print "Avg. NLL on testset:  {:.2f} ± {:.2f}".format(NLL_test.avg, NLL_test.stderr)
+
+    # Save results JSON file.
+    if not os.path.isfile(pjoin(experiment_path, "result.json")) or args.force:
+        result = {'lnZ': lnZ,
+                  'lnZ_down': lnZ_down,
+                  'lnZ_up': lnZ_up,
+                  'trainset': [NLL_train.avg, NLL_train.stderr],
+                  'validset': [NLL_valid.avg, NLL_valid.stderr],
+                  'testset': [NLL_test.avg, NLL_test.stderr],
+                  }
+        utils.save_dict_to_json_file(pjoin(experiment_path, "result.json"), result)
 
 if __name__ == "__main__":
     main()
