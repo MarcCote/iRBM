@@ -52,7 +52,7 @@ class Dataset(object):
         return len(self.inputs.get_value())
 
 
-def load_binarized_mnist():
+def load_binarized_mnist(percent=1.):
     dataset_name = "binarized_mnist"
     if not os.path.isdir(DATASETS_FOLDER):
         os.mkdir(DATASETS_FOLDER)
@@ -85,14 +85,16 @@ def load_binarized_mnist():
                  testset_inputs=testset)
 
     data = np.load(dataset_npy)
-    trainset = Dataset(data['trainset_inputs'].astype(theano.config.floatX), name="trainset")
-    validset = Dataset(data['validset_inputs'].astype(theano.config.floatX), name="validset")
+    nb_train_data = int(percent*len(data['trainset_inputs']))
+    nb_valid_data = int(percent*len(data['validset_inputs']))
+    trainset = Dataset(data['trainset_inputs'][:nb_train_data].astype(theano.config.floatX), name="trainset")
+    validset = Dataset(data['validset_inputs'][:nb_valid_data].astype(theano.config.floatX), name="validset")
     testset = Dataset(data['testset_inputs'].astype(theano.config.floatX), name="testset")
 
     return trainset, validset, testset
 
 
-def load_caltech101_silhouettes28():
+def load_caltech101_silhouettes28(percent=1.):
     dataset_name = "caltech101_silhouettes28"
     if not os.path.isdir(DATASETS_FOLDER):
         os.mkdir(DATASETS_FOLDER)
@@ -120,17 +122,19 @@ def load_caltech101_silhouettes28():
                  testset_inputs=testset_inputs)
 
     data = np.load(dataset_npy)
-    trainset = Dataset(data['trainset_inputs'].astype(theano.config.floatX), name="trainset")
-    validset = Dataset(data['validset_inputs'].astype(theano.config.floatX), name="validset")
+    nb_train_data = int(percent*len(data['trainset_inputs']))
+    nb_valid_data = int(percent*len(data['validset_inputs']))
+    trainset = Dataset(data['trainset_inputs'][:nb_train_data].astype(theano.config.floatX), name="trainset")
+    validset = Dataset(data['validset_inputs'][:nb_valid_data].astype(theano.config.floatX), name="validset")
     testset = Dataset(data['testset_inputs'].astype(theano.config.floatX), name="testset")
 
     return trainset, validset, testset
 
 
-def load(dataset_name):
+def load(dataset_name, percent=1.):
     if dataset_name.lower() == "binarized_mnist":
-        return load_binarized_mnist()
+        return load_binarized_mnist(percent)
     elif dataset_name.lower() == "caltech101_silhouettes28":
-        return load_caltech101_silhouettes28()
+        return load_caltech101_silhouettes28(percent)
     else:
         raise ValueError("Unknown dataset: {0}!".format(dataset_name))
