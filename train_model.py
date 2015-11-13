@@ -126,6 +126,9 @@ def buildArgsParser():
                          help='name of the experiment. Default: name is generated from arguments.')
     general.add_argument('--seed', type=int,
                          help='seed used to generate random numbers. Default=1234.', default=1234)
+    general.add_argument('--keep', type=int, metavar="K",
+                         help='if specified, keep a copy of the model each K epoch.')
+
     general.add_argument('-f', '--force', action='store_true', help='restart training from scratch instead of resuming.')
 
     subparser = p.add_subparsers(title="Models", metavar="", dest="model")
@@ -203,6 +206,8 @@ def main():
 
         # Save training progression
         trainer.add_task(tasks.SaveProgression(model, experiment_path))
+        if args.keep is not None:
+            trainer.add_task(tasks.KeepProgression(model, experiment_path, each_epoch=args.keep))
 
         trainer.build()
 

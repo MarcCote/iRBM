@@ -27,10 +27,10 @@ def model_factory(model_name, input_size, hyperparams):
 
     #Set regularization method that will be used.
     regularization_method = NoRegularization()
-    if hyperparams["L1Regularization"] is not None:
+    if hyperparams["L1Regularization"] is not None and hyperparams["L1Regularization"] != 0:
         lambda_factor = float(hyperparams["L1Regularization"])
         regularization_method = L1Regularization(lambda_factor)
-    elif hyperparams["L2Regularization"] is not None:
+    elif hyperparams["L2Regularization"] is not None and hyperparams["L2Regularization"] != 0:
         lambda_factor = float(hyperparams["L2Regularization"])
         regularization_method = L2Regularization(lambda_factor)
 

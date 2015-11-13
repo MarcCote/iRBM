@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
 
+import os
 import numpy as np
 import theano
 import theano.tensor as T
@@ -166,6 +167,29 @@ class SaveProgression(Task):
         status = {'no_epoch': no_epoch,
                   'no_update': no_update}
         utils.save_dict_to_json_file(pjoin(self.savedir, "status.json"), status)
+
+    def post_epoch(self, no_epoch, no_update):
+        if no_epoch % self.each_epoch == 0:
+            self.execute(no_epoch, no_update)
+
+
+class KeepProgression(Task):
+    def __init__(self, model, savedir, each_epoch=1):
+        super(KeepProgression, self).__init__()
+
+        self.savedir = savedir
+        self.model = model
+        self.each_epoch = each_epoch
+
+    def execute(self, no_epoch, no_update):
+        savedir = pjoin(self.savedir, str(no_epoch))
+        if not os.path.isdir():
+            os.makedirs(savedir)
+
+        self.model.save(pjoin(savedir, "model.pkl"))
+        status = {'no_epoch': no_epoch,
+                  'no_update': no_update}
+        utils.save_dict_to_json_file(pjoin(savedir, "status.json"), status)
 
     def post_epoch(self, no_epoch, no_update):
         if no_epoch % self.each_epoch == 0:
