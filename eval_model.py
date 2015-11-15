@@ -88,7 +88,8 @@ def main():
     hyperparams = utils.load_dict_from_json_file(pjoin(experiment_path, "hyperparams.json"))
 
     with Timer("Loading dataset"):
-        trainset, validset, testset = dataset.load(hyperparams['dataset'])
+        trainset, validset, testset = dataset.load(hyperparams['dataset'], hyperparams.get('dataset_percent', 1.))
+        print " (data: {:,}; {:,}; {:,}) ".format(len(trainset), len(validset), len(testset)),
 
     with Timer("Loading model"):
         if hyperparams["model"] == "rbm":
