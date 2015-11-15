@@ -2,6 +2,7 @@
 from __future__ import division
 
 import os
+import shutil
 import numpy as np
 import theano
 import theano.tensor as T
@@ -183,8 +184,11 @@ class KeepProgression(Task):
 
     def execute(self, no_epoch, no_update):
         savedir = pjoin(self.savedir, str(no_epoch))
-        if not os.path.isdir():
+        if not os.path.isdir(savedir):
             os.makedirs(savedir)
+
+        shutil.copy(pjoin(self.savedir, 'hyperparams.json'),
+                    pjoin(savedir, 'hyperparams.json'))
 
         self.model.save(pjoin(savedir, "model.pkl"))
         status = {'no_epoch': no_epoch,

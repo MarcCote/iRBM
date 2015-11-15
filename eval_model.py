@@ -123,12 +123,12 @@ def main():
 
     # Save results JSON file.
     if not os.path.isfile(pjoin(experiment_path, "result.json")) or args.force:
-        result = {'lnZ': lnZ,
-                  'lnZ_down': lnZ_down,
-                  'lnZ_up': lnZ_up,
-                  'trainset': [NLL_train.avg, NLL_train.stderr],
-                  'validset': [NLL_valid.avg, NLL_valid.stderr],
-                  'testset': [NLL_test.avg, NLL_test.stderr],
+        result = {'lnZ': float(lnZ),
+                  'lnZ_down': float(lnZ_down),
+                  'lnZ_up': float(lnZ_up),
+                  'trainset': [float(NLL_train.avg), float(NLL_train.stderr)],
+                  'validset': [float(NLL_valid.avg), float(NLL_valid.stderr)],
+                  'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
                   }
         utils.save_dict_to_json_file(pjoin(experiment_path, "result.json"), result)
 
