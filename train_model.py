@@ -62,7 +62,7 @@ def build_train_orbm_argparser(subparser):
     model.add_argument('--cdk', metavar='K', type=int,
                        help='number of Gibbs sampling steps in Contrastive Divergence.', default=1)
     model.add_argument('--PCD', action='store_true', help='use Persistent Contrastive Divergence')
-    model.add_argument('--beta', type=float, help='$\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
+    model.add_argument('--beta', type=float, help='$\\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
 
     # General parameters (optional)
     general = p.add_argument_group("General arguments")
@@ -84,7 +84,7 @@ def build_train_irbm_argparser(subparser):
     model.add_argument('--cdk', metavar='K', type=int,
                        help='number of Gibbs sampling steps in Contrastive Divergence.', default=1)
     model.add_argument('--PCD', action='store_true', help='use Persistent Contrastive Divergence')
-    model.add_argument('--beta', type=float, help='$\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
+    model.add_argument('--beta', type=float, help='$\\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
 
     # General parameters (optional)
     general = p.add_argument_group("General arguments")
