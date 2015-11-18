@@ -208,7 +208,7 @@ def main():
             trainer.add_task(irbm.GrowiRBM(model))
 
         # Save training progression
-        trainer.add_task(tasks.SaveProgression(model, experiment_path))
+        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=10))
         if args.keep is not None:
             trainer.add_task(tasks.KeepProgression(model, experiment_path, each_epoch=args.keep))
 
