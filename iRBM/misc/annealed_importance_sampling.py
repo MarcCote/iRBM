@@ -7,11 +7,14 @@ import theano.tensor as T
 from theano import config
 
 
-def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]):
+def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)], batch_size=None):
     """
     ref: Salakhutdinov & Murray (2008), On the quantitative analysis of deep belief networks
     """
-    model.batch_size = M  # Will be executing M AIS's runs in parallel.
+    if batch_size is None:
+        batch_size = M
+
+    model.batch_size = batch_size  # Will be executing `batch_size` AIS's runs in parallel.
 
     def _log_annealed_importance_sample(v, k, betas, annealable_params):
         beta_k = betas[k]
@@ -48,7 +51,7 @@ def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linsp
     betas = theano.shared(value=betas.astype(config.floatX), name="Betas", borrow=True)
 
     k = T.iscalar('k')
-    v = theano.shared(np.zeros((M, model.input_size), dtype=config.floatX))
+    v = theano.shared(np.zeros((batch_size, model.input_size), dtype=config.floatX))
 
     sym_log_w_ais_k, updates = _log_annealed_importance_sample(v, k, betas, annealable_params)
     log_annealed_importance_sample = theano.function([k],
@@ -57,17 +60,19 @@ def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linsp
 
     lnZ_trivial = base_rate.compute_lnZ().eval()
 
-    h0 = base_rate.sample_h_given_v(T.zeros((M, model.input_size), dtype=config.floatX))
+    h0 = base_rate.sample_h_given_v(T.zeros((batch_size, model.input_size), dtype=config.floatX))
     v0 = base_rate.sample_v_given_h(h0).eval()
 
     v.set_value(v0)  # Set initial v for AIS
 
-    # Will be executing M AIS's runs in parallel.
+    # Will be executing M AIS's runs.
     M_log_w_ais = np.zeros(M, dtype=np.float64)
 
     # Iterate through all betas (temperature parameter)
-    for k in xrange(1, len(betas.get_value())):
-        M_log_w_ais += log_annealed_importance_sample(k)
+    for i in range(0, M, batch_size):
+        print "AIS run: {}/{} (using batch size of {})".format(i, M, batch_size)
+        for k in xrange(1, len(betas.get_value())):
+            M_log_w_ais[i:i+batch_size] += log_annealed_importance_sample(k)
 
     M_log_w_ais += lnZ_trivial
 
@@ -103,6 +108,23 @@ def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linsp
             "std_lnZ": std_lnZ,
             "last_sample_chain": v.get_value()
             }
+
+
+def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]):
+    # Try different size of batch size.
+    for batch_size in np.linspace(M, 1, 11):
+        try:
+            return _compute_AIS(model, M=M, betas=betas, batch_size=int(batch_size))
+        except MemoryError:
+            # Probably not enough memory on GPU
+            pass
+        except ValueError:
+            # Probably because of the limited Multinomial op
+            pass
+
+        print "*An error occured while computing AIS. Will try a smaller batch size to compute AIS."
+
+    raise RuntimeError("Cannot find a suitable batch size to compute AIS. Try using CPU instead.")
 
 
 def estimate_lnZ(rbm, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]):
