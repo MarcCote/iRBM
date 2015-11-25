@@ -84,6 +84,10 @@ def main():
     if not os.path.isfile(pjoin(experiment_path, "hyperparams.json")):
         parser.error('Cannot find hyperparams for experiment: {0}!'.format(experiment_path))
 
+    result_file = pjoin(experiment_path, "result.json")
+    if os.path.isfile(result_file) and not args.force:
+        parser.error('{0} already exists. Use --force to overwrite it.'.format(result_file))
+
     # Load experiments hyperparameters
     hyperparams = utils.load_dict_from_json_file(pjoin(experiment_path, "hyperparams.json"))
 
@@ -123,15 +127,14 @@ def main():
     print "Avg. NLL on testset:  {:.2f} ± {:.2f}".format(NLL_test.avg, NLL_test.stderr)
 
     # Save results JSON file.
-    if not os.path.isfile(pjoin(experiment_path, "result.json")) or args.force:
-        result = {'lnZ': float(lnZ),
-                  'lnZ_down': float(lnZ_down),
-                  'lnZ_up': float(lnZ_up),
-                  'trainset': [float(NLL_train.avg), float(NLL_train.stderr)],
-                  'validset': [float(NLL_valid.avg), float(NLL_valid.stderr)],
-                  'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
-                  }
-        utils.save_dict_to_json_file(pjoin(experiment_path, "result.json"), result)
+    result = {'lnZ': float(lnZ),
+              'lnZ_down': float(lnZ_down),
+              'lnZ_up': float(lnZ_up),
+              'trainset': [float(NLL_train.avg), float(NLL_train.stderr)],
+              'validset': [float(NLL_valid.avg), float(NLL_valid.stderr)],
+              'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
+              }
+    utils.save_dict_to_json_file(result_file, result)
 
 if __name__ == "__main__":
     main()

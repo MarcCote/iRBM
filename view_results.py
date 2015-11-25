@@ -69,13 +69,16 @@ def main():
         status_file = pjoin(exp_folder, "status.json")
 
         if not os.path.isfile(result_file):
-            parser.error('{0} is not a file!'.format(result_file))
+            print 'Skip: {0} is not a file!'.format(result_file)
+            continue
 
         if not os.path.isfile(hyperparams_file):
-            parser.error('{0} is not a file!'.format(hyperparams_file))
+            print 'Skip: {0} is not a file!'.format(hyperparams_file)
+            continue
 
         if not os.path.isfile(status_file):
-            parser.error('{0} is not a file!'.format(status_file))
+            print 'Skip: {0} is not a file!'.format(status_file)
+            continue
 
         results_files.append(result_file)
         hyperparams_files.append(hyperparams_file)
