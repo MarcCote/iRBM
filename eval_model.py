@@ -108,6 +108,7 @@ def main():
 
         # Load the actual model.
         model = model_class.load(pjoin(experiment_path, "model.pkl"))
+        print "({} hidden units)".format(model.hidden_size)
 
     if args.lnZ is None:
         with Timer("Estimating model's partition function with AIS({0}) and {1} temperatures.".format(args.nb_samples, args.nb_temperatures)):
