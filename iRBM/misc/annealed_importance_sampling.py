@@ -60,17 +60,17 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
 
     lnZ_trivial = base_rate.compute_lnZ().eval()
 
-    h0 = base_rate.sample_h_given_v(T.zeros((batch_size, model.input_size), dtype=config.floatX))
-    v0 = base_rate.sample_v_given_h(h0).eval()
-
-    v.set_value(v0)  # Set initial v for AIS
-
     # Will be executing M AIS's runs.
     M_log_w_ais = np.zeros(M, dtype=np.float64)
 
     # Iterate through all betas (temperature parameter)
     for i in range(0, M, batch_size):
         print "AIS run: {}/{} (using batch size of {})".format(i, M, batch_size)
+
+        h0 = base_rate.sample_h_given_v(T.zeros((batch_size, model.input_size), dtype=config.floatX))
+        v0 = base_rate.sample_v_given_h(h0).eval()
+        v.set_value(v0)  # Set initial v for AIS
+
         for k in xrange(1, len(betas.get_value())):
             M_log_w_ais[i:i+batch_size] += log_annealed_importance_sample(k)
 
