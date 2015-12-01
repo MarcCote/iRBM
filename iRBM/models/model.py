@@ -21,6 +21,10 @@ class Model():
 
         self.batch_size = 1
 
+    def set_rng_seed(self, seed):
+        self.np_rng = np.random.RandomState(seed)
+        self.theano_rng = RandomStreams(self.np_rng.randint(2**30))
+
     def post_update(self, no_epoch, no_batch):
         pass
 

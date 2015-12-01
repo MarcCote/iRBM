@@ -61,18 +61,24 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
     lnZ_trivial = base_rate.compute_lnZ().eval()
 
     # Will be executing M AIS's runs.
+    last_samples = np.zeros((M, model.input_size), dtype=config.floatX)
     M_log_w_ais = np.zeros(M, dtype=np.float64)
 
-    # Iterate through all betas (temperature parameter)
+    # Iterate through all AIS runs.
     for i in range(0, M, batch_size):
+        actual_size = min(M - i, batch_size)
         print "AIS run: {}/{} (using batch size of {})".format(i, M, batch_size)
 
         h0 = base_rate.sample_h_given_v(T.zeros((batch_size, model.input_size), dtype=config.floatX))
         v0 = base_rate.sample_v_given_h(h0).eval()
         v.set_value(v0)  # Set initial v for AIS
 
+        # Iterate through all betas (temperature parameter)
         for k in xrange(1, len(betas.get_value())):
-            M_log_w_ais[i:i+batch_size] += log_annealed_importance_sample(k)
+            M_log_w_ais[i:i+batch_size] += log_annealed_importance_sample(k)[:actual_size]
+
+        # Keep samples generated using AIS.
+        last_samples[i:i+batch_size] = v.get_value()[:actual_size]
 
     M_log_w_ais += lnZ_trivial
 
@@ -97,7 +103,7 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
 
     # Compute the standard deviation of ln(Z)
     std_lnZ = np.array([np.std(M_log_w_ais[:k], ddof=1) for k in Ms[1:]])
-    std_lnZ[0] = np.nan  # Standard deviation of only one sample does not exist.
+    std_lnZ = np.r_[np.nan, std_lnZ]  # Standard deviation of only one sample does not exist.
 
     return {"logcummean_Z": logcummean_Z.astype(config.floatX),
             "logcumstd_Z_down": logcumstd_Z_down.astype(config.floatX),
@@ -106,23 +112,28 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
             "M_log_w_ais": M_log_w_ais,
             "lnZ_trivial": lnZ_trivial,
             "std_lnZ": std_lnZ,
-            "last_sample_chain": v.get_value()
+            "last_sample_chain": last_samples
             }
 
 
 def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]):
     # Try different size of batch size.
-    for batch_size in np.linspace(M, 1, 11):
+    batch_size = M
+    while batch_size >= 1:
+        "Computing AIS using batch size of {}".format(batch_size)
         try:
             return _compute_AIS(model, M=M, betas=betas, batch_size=int(batch_size))
-        except MemoryError:
+        except MemoryError as e:
+            print e
             # Probably not enough memory on GPU
             pass
-        except ValueError:
+        except ValueError as e:
+            print e
             # Probably because of the limited Multinomial op
             pass
 
         print "*An error occured while computing AIS. Will try a smaller batch size to compute AIS."
+        batch_size = batch_size // 2
 
     raise RuntimeError("Cannot find a suitable batch size to compute AIS. Try using CPU instead.")
 
