@@ -166,7 +166,8 @@ class SaveProgression(Task):
     def execute(self, no_epoch, no_update):
         self.model.save(pjoin(self.savedir, "model.pkl"))
         status = {'no_epoch': no_epoch,
-                  'no_update': no_update}
+                  'no_update': no_update,
+                  'hidden_size': self.model.hidden_size}
         utils.save_dict_to_json_file(pjoin(self.savedir, "status.json"), status)
 
     def post_epoch(self, no_epoch, no_update):
@@ -192,7 +193,8 @@ class KeepProgression(Task):
 
         self.model.save(pjoin(savedir, "model.pkl"))
         status = {'no_epoch': no_epoch,
-                  'no_update': no_update}
+                  'no_update': no_update,
+                  'hidden_size': self.model.hidden_size}
         utils.save_dict_to_json_file(pjoin(savedir, "status.json"), status)
 
     def post_epoch(self, no_epoch, no_update):

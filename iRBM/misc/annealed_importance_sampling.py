@@ -43,6 +43,8 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
         for name, param in params:
             setattr(model, name, param)
 
+        del params
+
         return log_pk-log_pk_minus_1, updates
 
     # Base rate with same visible biases as the model
