@@ -28,14 +28,6 @@ def compute_AvgFv(model, *datasets):
     return map(avg_fv, datasets)
 
 
-def compute_lnZ(model, nb_chains, temperatures):
-    ais_results = compute_AIS(model, M=nb_chains, betas=temperatures)
-    lnZ_est = ais_results['logcummean_Z'][-1]
-    lnZ_down = ais_results['logcumstd_Z_down'][-1]
-    lnZ_up = ais_results['logcumstd_Z_up'][-1]
-    return lnZ_est, lnZ_down, lnZ_up
-
-
 def compute_AvgStderrNLL(model, lnZ, *datasets):
     avg_stderr_nll = build_avg_stderr_nll(model)
     datasets = map(lambda d: d.inputs.get_value(), datasets)
@@ -55,10 +47,16 @@ def buildArgsParser():
                      help='use M samples in AIS. Default=5000', default=5000)
     ais.add_argument('--nb-temperatures', metavar='N', type=int,
                      help='AIS will be performed using N temperatures between [0,1]. Default 100000.', default=100000)
+    ais.add_argument('--seed', type=int,
+                     help="Seed used to initialize model's random generator. Default: 1234", default=1234)
 
     lnZ = p.add_argument_group("Partition function (lnZ) informations")
     lnZ.add_argument('--lnZ', metavar=("lnZ", "lnZ_down", "lnZ_up"), type=float, nargs=3,
                      help='use this information (i.e. lnZ lnZ_down lnZ_up) about the partition function instead of approximating it with AIS.')
+
+    general = p.add_argument_group("General arguments")
+    general.add_argument('--view', action='store_true',
+                         help='display AIS graph.')
 
     p.add_argument('-f', '--force', action='store_true', help='Overwrite existing `result.json`')
 
@@ -84,10 +82,6 @@ def main():
     if not os.path.isfile(pjoin(experiment_path, "hyperparams.json")):
         parser.error('Cannot find hyperparams for experiment: {0}!'.format(experiment_path))
 
-    result_file = pjoin(experiment_path, "result.json")
-    if os.path.isfile(result_file) and not args.force:
-        parser.error('{0} already exists. Use --force to overwrite it.'.format(result_file))
-
     # Load experiments hyperparameters
     hyperparams = utils.load_dict_from_json_file(pjoin(experiment_path, "hyperparams.json"))
 
@@ -110,13 +104,43 @@ def main():
         model = model_class.load(pjoin(experiment_path, "model.pkl"))
         print "({} hidden units)".format(model.hidden_size)
 
-    if args.lnZ is None:
-        with Timer("Estimating model's partition function with AIS({0}) and {1} temperatures.".format(args.nb_samples, args.nb_temperatures)):
-            lnZ, lnZ_down, lnZ_up = compute_lnZ(model, nb_chains=args.nb_samples, temperatures=np.linspace(0, 1, args.nb_temperatures))
-            lnZ_down = lnZ - lnZ_down
-            lnZ_up = lnZ + lnZ_up
-    else:
+    # Result files.
+    ais_result_file = pjoin(experiment_path, "ais_result.json")
+    result_file = pjoin(experiment_path, "result.json")
+
+    if args.lnZ is not None:
         lnZ, lnZ_down, lnZ_up = args.lnZ
+    else:
+        if not os.path.isfile(ais_result_file) or args.force:
+            with Timer("Estimating model's partition function with AIS({0}) and {1} temperatures.".format(args.nb_samples, args.nb_temperatures)):
+                model.set_rng_seed(args.seed)
+                ais_results = compute_AIS(model, M=args.nb_samples, betas=np.linspace(0, 1, args.nb_temperatures))
+                ais_results['nb_samples'] = args.nb_samples
+                ais_results['nb_temperatures'] = args.nb_temperatures
+                ais_results['seed'] = args.seed
+                utils.save_dict_to_json_file(ais_result_file, ais_results)
+        else:
+            print "Loading previous AIS results... (use --force to re-run AIS)"
+            ais_results = utils.load_dict_from_json_file(ais_result_file)
+            print "AIS({0}) with {1} temperatures".format(ais_results['nb_samples'], ais_results['nb_temperatures'])
+
+            if ais_results['nb_samples'] != args.nb_samples:
+                print "The number of samples specified ({:,}) doesn't match the one found in ais_results.json ({:,}). Aborting.".format(args.nb_samples, ais_results['nb_samples'])
+                sys.exit(-1)
+
+            if ais_results['nb_temperatures'] != args.nb_temperatures:
+                print "The number of temperatures specified ({:,}) doesn't match the one found in ais_results.json ({:,}). Aborting.".format(args.nb_temperatures, ais_results['nb_temperatures'])
+                sys.exit(-1)
+
+            if ais_results['seed'] != args.seed:
+                print "The seed specified ({}) doesn't match the one found in ais_results.json ({}). Aborting.".format(args.seed, ais_results['seed'])
+                sys.exit(-1)
+
+        lnZ = ais_results['logcummean_Z'][-1]
+        logcumstd_Z_down = ais_results['logcumstd_Z_down'][-1]
+        logcumstd_Z_up = ais_results['logcumstd_Z_up'][-1]
+        lnZ_down = lnZ - logcumstd_Z_down
+        lnZ_up = lnZ + logcumstd_Z_up
 
     print "-> lnZ: {lnZ_down} <= {lnZ} <= {lnZ_up}".format(lnZ_down=lnZ_down, lnZ=lnZ, lnZ_up=lnZ_up)
 
@@ -136,6 +160,38 @@ def main():
               'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
               }
     utils.save_dict_to_json_file(result_file, result)
+
+    if args.view:
+
+        from iRBM.misc import vizu
+        import matplotlib.pyplot as plt
+
+        if hyperparams["dataset"] == "binarized_mnist":
+            image_shape = (28, 28)
+        elif hyperparams["dataset"] == "caltech101_silhouettes28":
+            image_shape = (28, 28)
+        else:
+            raise ValueError("Unknown dataset: {0}".format(hyperparams["dataset"]))
+
+        # Display AIS samples.
+        data = vizu.concatenate_images(ais_results['last_sample_chain'], shape=image_shape, border_size=1, clim=(0, 1))
+        plt.figure()
+        plt.imshow(data, cmap=plt.cm.gray, interpolation='nearest')
+        plt.title("AIS samples")
+
+        # Display AIS ~lnZ.
+        plt.figure()
+        plt.gca().set_xmargin(0.1)
+        plt.errorbar(np.arange(ais_results['nb_samples'])+1, ais_results["logcummean_Z"],
+                     yerr=[ais_results['logcumstd_Z_down'], ais_results['logcumstd_Z_up']],
+                     fmt='ob', label='with std ~ln std Z')
+        plt.legend()
+        plt.ticklabel_format(useOffset=False, axis='y')
+        plt.title("~ln mean Z for different number of AIS samples")
+        plt.ylabel("~lnZ")
+        plt.xlabel("# AIS samples")
+
+        plt.show()
 
 if __name__ == "__main__":
     main()
