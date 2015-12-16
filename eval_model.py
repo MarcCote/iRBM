@@ -113,11 +113,7 @@ def main():
     else:
         if not os.path.isfile(ais_result_file) or args.force:
             with Timer("Estimating model's partition function with AIS({0}) and {1} temperatures.".format(args.nb_samples, args.nb_temperatures)):
-                model.set_rng_seed(args.seed)
-                ais_results = compute_AIS(model, M=args.nb_samples, betas=np.linspace(0, 1, args.nb_temperatures))
-                ais_results['nb_samples'] = args.nb_samples
-                ais_results['nb_temperatures'] = args.nb_temperatures
-                ais_results['seed'] = args.seed
+                ais_results = compute_AIS(model, M=args.nb_samples, betas=np.linspace(0, 1, args.nb_temperatures), seed=args.seed, experiment_path=experiment_path, force=args.force)
                 utils.save_dict_to_json_file(ais_result_file, ais_results)
         else:
             print "Loading previous AIS results... (use --force to re-run AIS)"

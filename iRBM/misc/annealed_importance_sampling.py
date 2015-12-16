@@ -2,19 +2,25 @@
 
 import numpy as np
 
+import os
+import shutil
+from os.path import join as pjoin
+
 import theano
 import theano.tensor as T
 from theano import config
 
+import utils
 
-def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)], batch_size=None):
+
+BETAS = np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]
+
+
+def _compute_AIS_samples(model, M=100, betas=BETAS):
     """
     ref: Salakhutdinov & Murray (2008), On the quantitative analysis of deep belief networks
     """
-    if batch_size is None:
-        batch_size = M
-
-    model.batch_size = batch_size  # Will be executing `batch_size` AIS's runs in parallel.
+    model.batch_size = M  # Will be executing `M` AIS's runs in parallel.
 
     def _log_annealed_importance_sample(v, k, betas, annealable_params):
         beta_k = betas[k]
@@ -53,7 +59,7 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
     betas = theano.shared(value=betas.astype(config.floatX), name="Betas", borrow=True)
 
     k = T.iscalar('k')
-    v = theano.shared(np.zeros((batch_size, model.input_size), dtype=config.floatX))
+    v = theano.shared(np.zeros((M, model.input_size), dtype=config.floatX))
 
     sym_log_w_ais_k, updates = _log_annealed_importance_sample(v, k, betas, annealable_params)
     log_annealed_importance_sample = theano.function([k],
@@ -63,26 +69,76 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
     lnZ_trivial = base_rate.compute_lnZ().eval()
 
     # Will be executing M AIS's runs.
-    last_samples = np.zeros((M, model.input_size), dtype=config.floatX)
+    last_sample_chain = np.zeros((M, model.input_size), dtype=config.floatX)
     M_log_w_ais = np.zeros(M, dtype=np.float64)
+
+    # First sample V0
+    h0 = base_rate.sample_h_given_v(T.zeros((M, model.input_size), dtype=config.floatX))
+    v0 = base_rate.sample_v_given_h(h0).eval()
+    v.set_value(v0)  # Set initial v for AIS
+
+    # Iterate through all betas (temperature parameter)
+    for k in xrange(1, len(betas.get_value())):
+        M_log_w_ais += log_annealed_importance_sample(k)
+
+        # Keep samples generated using AIS.
+        last_sample_chain = v.get_value()
+
+    M_log_w_ais += lnZ_trivial
+    return {"M_log_w_ais": M_log_w_ais,
+            "last_sample_chain": last_sample_chain,
+            "lnZ_trivial": lnZ_trivial}
+
+
+def _compute_AIS(model, M=100, betas=BETAS, batch_size=None, seed=1234, experiment_path=".", force=False):
+    ais_results_json = pjoin(experiment_path, "ais_results.part.json")
+
+    # TMP: TODELETE
+    if batch_size > 25:
+        raise MemoryError
+
+    if batch_size is None:
+        batch_size = M
+
+    # Will be executing M AIS's runs.
+    last_sample_chain = np.zeros((M, model.input_size), dtype=config.floatX)
+    M_log_w_ais = np.zeros(M, dtype=np.float64)
+
+    model.set_rng_seed(seed)
+
+    ais_results = {}
+    if os.path.isfile(ais_results_json) and not force:
+        print "Resuming AIS using info from {}".format(ais_results_json)
+        ais_results = utils.load_dict_from_json_file(ais_results_json)
+        M_log_w_ais = ais_results['M_log_w_ais']
+        last_sample_chain = ais_results['last_sample_chain']
+        lnZ_trivial = ais_results['lnZ_trivial']
 
     # Iterate through all AIS runs.
     for i in range(0, M, batch_size):
+        if i <= ais_results.get('batch_id', -1):
+            continue
+
+        model.set_rng_seed(seed+i)
         actual_size = min(M - i, batch_size)
         print "AIS run: {}/{} (using batch size of {})".format(i, M, batch_size)
+        ais_partial_results = _compute_AIS_samples(model, M=actual_size, betas=betas)
 
-        h0 = base_rate.sample_h_given_v(T.zeros((batch_size, model.input_size), dtype=config.floatX))
-        v0 = base_rate.sample_v_given_h(h0).eval()
-        v.set_value(v0)  # Set initial v for AIS
+        M_log_w_ais[i:i+batch_size] = ais_partial_results['M_log_w_ais']
+        last_sample_chain[i:i+batch_size] = ais_partial_results['last_sample_chain']
+        lnZ_trivial = ais_partial_results['lnZ_trivial']
 
-        # Iterate through all betas (temperature parameter)
-        for k in xrange(1, len(betas.get_value())):
-            M_log_w_ais[i:i+batch_size] += log_annealed_importance_sample(k)[:actual_size]
+        # Save partial results
+        if os.path.isfile(ais_results_json):
+            shutil.copy(ais_results_json, ais_results_json[:-4] + "old.json")
 
-        # Keep samples generated using AIS.
-        last_samples[i:i+batch_size] = v.get_value()[:actual_size]
-
-    M_log_w_ais += lnZ_trivial
+        ais_results = {'batch_id': i,
+                       'M': M,
+                       'batch_size': batch_size,
+                       'last_sample_chain': last_sample_chain,
+                       'M_log_w_ais': M_log_w_ais,
+                       'lnZ_trivial': lnZ_trivial}
+        utils.save_dict_to_json_file(ais_results_json, ais_results)
 
     # We compute the mean of the estimated `r_AIS`
     Ms = np.arange(1, M+1)
@@ -114,17 +170,21 @@ def _compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.lins
             "M_log_w_ais": M_log_w_ais,
             "lnZ_trivial": lnZ_trivial,
             "std_lnZ": std_lnZ,
-            "last_sample_chain": last_samples
+            "last_sample_chain": last_sample_chain,
+            "batch_size": batch_size,
+            "seed": seed,
+            "nb_temperatures": len(betas),
+            "nb_samples": M
             }
 
 
-def compute_AIS(model, M=100, betas=np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]):
+def compute_AIS(model, M=100, betas=BETAS, seed=1234, experiment_path=".", force=False):
     # Try different size of batch size.
     batch_size = M
     while batch_size >= 1:
         "Computing AIS using batch size of {}".format(batch_size)
         try:
-            return _compute_AIS(model, M=M, betas=betas, batch_size=int(batch_size))
+            return _compute_AIS(model, M=M, betas=betas, batch_size=int(batch_size), seed=seed, experiment_path=experiment_path, force=force)
         except MemoryError as e:
             print e
             # Probably not enough memory on GPU
