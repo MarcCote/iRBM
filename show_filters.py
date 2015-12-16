@@ -76,6 +76,9 @@ def main():
     clim = (weights.min(), weights.max())
     data = vizu.concatenate_images(args.contrast*weights, shape=image_shape, border_size=1, clim=clim)
     plt.imshow(data, cmap=plt.cm.gray, interpolation='nearest')
+    plt.tight_layout()
+    plt.xticks([])
+    plt.yticks([])
     plt.show()
 
 if __name__ == "__main__":
