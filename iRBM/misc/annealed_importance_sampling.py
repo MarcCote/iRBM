@@ -93,10 +93,6 @@ def _compute_AIS_samples(model, M=100, betas=BETAS):
 def _compute_AIS(model, M=100, betas=BETAS, batch_size=None, seed=1234, experiment_path=".", force=False):
     ais_results_json = pjoin(experiment_path, "ais_results.part.json")
 
-    # TMP: TODELETE
-    if batch_size > 25:
-        raise MemoryError
-
     if batch_size is None:
         batch_size = M
 
