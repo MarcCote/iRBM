@@ -84,6 +84,7 @@ def build_train_irbm_argparser(subparser):
     model.add_argument('--cdk', metavar='K', type=int,
                        help='number of Gibbs sampling steps in Contrastive Divergence.', default=1)
     model.add_argument('--PCD', action='store_true', help='use Persistent Contrastive Divergence')
+    model.add_argument('--shrinkable', action='store_true', help='allows the model to shrink using the heuristic mentioned in the paper.')
     model.add_argument('--beta', type=float, help='$\\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
 
     # General parameters (optional)
@@ -150,6 +151,7 @@ def main():
     # Remove hyperparams that should not be part of the hash
     del hyperparams['nb_epochs']
     del hyperparams['max_epoch']
+    del hyperparams['keep']
     del hyperparams['force']
     del hyperparams['name']
 
@@ -205,10 +207,10 @@ def main():
         trainer.add_task(tasks.Print(avg_reconstruction_error, msg="Avg. reconstruction error: {0:.1f}"))
 
         if args.model == 'irbm':
-            trainer.add_task(irbm.GrowiRBM(model))
+            trainer.add_task(irbm.GrowiRBM(model, shrinkable=args.shrinkable))
 
         # Save training progression
-        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=10))
+        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=100))
         if args.keep is not None:
             trainer.add_task(tasks.KeepProgression(model, experiment_path, each_epoch=args.keep))
 

@@ -148,14 +148,15 @@ def main():
     print "Avg. NLL on testset:  {:.2f} ± {:.2f}".format(NLL_test.avg, NLL_test.stderr)
 
     # Save results JSON file.
-    result = {'lnZ': float(lnZ),
-              'lnZ_down': float(lnZ_down),
-              'lnZ_up': float(lnZ_up),
-              'trainset': [float(NLL_train.avg), float(NLL_train.stderr)],
-              'validset': [float(NLL_valid.avg), float(NLL_valid.stderr)],
-              'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
-              }
-    utils.save_dict_to_json_file(result_file, result)
+    if args.lnZ is None:
+        result = {'lnZ': float(lnZ),
+                  'lnZ_down': float(lnZ_down),
+                  'lnZ_up': float(lnZ_up),
+                  'trainset': [float(NLL_train.avg), float(NLL_train.stderr)],
+                  'validset': [float(NLL_valid.avg), float(NLL_valid.stderr)],
+                  'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
+                  }
+        utils.save_dict_to_json_file(result_file, result)
 
     if args.view:
 

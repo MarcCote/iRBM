@@ -68,6 +68,9 @@ class ConstantLearningRate(LearningRate):
     def __call__(self, gradients):
         return self.lr, OrderedDict()
 
+    def get_lr(self, param):
+        return self.lr(param)
+
 
 class ADAGRAD(LearningRate):
     def __init__(self, lr, eps=1e-6):
@@ -121,3 +124,11 @@ class ADAGRAD(LearningRate):
             learning_rates[param] = self.base_lr / root_sum_squared
 
         return learning_rates, updates
+
+    def get_lr(self, param):
+        params_names = map(lambda p: p.name, self.parameters)
+        idx_param = params_names.index('sum_squared_grad_' + param.name)
+        sum_squared_grad = self.parameters[idx_param]
+        root_sum_squared = np.sqrt(sum_squared_grad.get_value() + self.epsilon)
+        lr = self.base_lr / root_sum_squared
+        return lr
