@@ -50,10 +50,11 @@ class iRBM(oRBM):
 
 
 class GrowiRBM(tasks.Task):
-    def __init__(self, model, shrinkable=False):
+    def __init__(self, model, shrinkable=False, nb_neurons_to_add=1):
         super(GrowiRBM, self).__init__()
         self.model = model
         self.shrinkable = shrinkable
+        self.nb_neurons_to_add = nb_neurons_to_add
         self.maxZ = theano.shared(np.array(0, dtype="int64"))
 
         zmask_start = model.sample_zmask_given_v(model.CD.chain_start)
@@ -66,42 +67,54 @@ class GrowiRBM(tasks.Task):
         model = self.model
         increase_needed = model.hidden_size < model.max_hidden_size and self.maxZ.get_value() == model.hidden_size
 
-        decrease_needed = False
-        if self.shrinkable:
-            lr_W = model.learning_rate.get_lr(model.W)
-            lr_b = model.learning_rate.get_lr(model.b)
-            decrease_needed = np.all(abs(model.W.get_value()[-1]) <= model.regularize.decay * lr_W[-1]) and\
-                              abs(model.b.get_value()[-1]) <= model.regularize.decay * lr_b[-1]
-
-        if increase_needed and decrease_needed:
-            pass
-
-        elif increase_needed:
-            nb_neurons_to_add = 1
-
-            model.hidden_size += nb_neurons_to_add
-            model.W.set_value(np.r_[model.W.get_value(), np.zeros((nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)])
-            model.b.set_value(np.r_[model.b.get_value(), np.zeros(nb_neurons_to_add, dtype=theano.config.floatX)])
+        if increase_needed:
+            model.hidden_size += self.nb_neurons_to_add
+            model.W.set_value(np.r_[model.W.get_value(), np.zeros((self.nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)])
+            model.b.set_value(np.r_[model.b.get_value(), np.zeros(self.nb_neurons_to_add, dtype=theano.config.floatX)])
 
             # Also increase update rule params, if needed.
             for lr_param in model.learning_rate.parameters:
                 if model.W.name in lr_param.name:
-                    lr_param.set_value(np.r_[lr_param.get_value(), np.zeros((nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)])
+                    lr_param.set_value(np.r_[lr_param.get_value(), np.zeros((self.nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)])
                 elif model.b.name in lr_param.name:
-                    lr_param.set_value(np.r_[lr_param.get_value(), np.zeros(nb_neurons_to_add, dtype=theano.config.floatX)])
+                    lr_param.set_value(np.r_[lr_param.get_value(), np.zeros(self.nb_neurons_to_add, dtype=theano.config.floatX)])
 
-        elif decrease_needed and model.hidden_size > 1:
-            nb_neurons_to_del = 1
-            model.hidden_size -= nb_neurons_to_del
-            model.W.set_value(model.W.get_value()[:-nb_neurons_to_del])
-            model.b.set_value(model.b.get_value()[:-nb_neurons_to_del])
+        if self.shrinkable:
+            raise NotImplementedError
+            decrease_needed = False
+            if self.shrinkable:
+                lr_W = model.learning_rate.get_lr(model.W)
+                lr_b = model.learning_rate.get_lr(model.b)
+                decrease_needed = np.all(abs(model.W.get_value()[-1]) <= model.regularize.decay * lr_W[-1]) and\
+                                  abs(model.b.get_value()[-1]) <= model.regularize.decay * lr_b[-1]
 
-            # Also decrease update rule params, if needed.
-            for lr_param in model.learning_rate.parameters:
-                if model.W.name in lr_param.name:
-                    lr_param.set_value(lr_param.get_value()[:-nb_neurons_to_del])
-                elif model.b.name in lr_param.name:
-                    lr_param.set_value(lr_param.get_value()[:-nb_neurons_to_del])
+            if increase_needed and decrease_needed:
+                pass
+
+            elif increase_needed:
+                model.hidden_size += self.nb_neurons_to_add
+                model.W.set_value(np.r_[model.W.get_value(), np.zeros((self.nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)])
+                model.b.set_value(np.r_[model.b.get_value(), np.zeros(self.nb_neurons_to_add, dtype=theano.config.floatX)])
+
+                # Also increase update rule params, if needed.
+                for lr_param in model.learning_rate.parameters:
+                    if model.W.name in lr_param.name:
+                        lr_param.set_value(np.r_[lr_param.get_value(), np.zeros((self.nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)])
+                    elif model.b.name in lr_param.name:
+                        lr_param.set_value(np.r_[lr_param.get_value(), np.zeros(self.nb_neurons_to_add, dtype=theano.config.floatX)])
+
+            elif decrease_needed and model.hidden_size > 1:
+                nb_neurons_to_del = 1
+                model.hidden_size -= nb_neurons_to_del
+                model.W.set_value(model.W.get_value()[:-nb_neurons_to_del])
+                model.b.set_value(model.b.get_value()[:-nb_neurons_to_del])
+
+                # Also decrease update rule params, if needed.
+                for lr_param in model.learning_rate.parameters:
+                    if model.W.name in lr_param.name:
+                        lr_param.set_value(lr_param.get_value()[:-nb_neurons_to_del])
+                    elif model.b.name in lr_param.name:
+                        lr_param.set_value(lr_param.get_value()[:-nb_neurons_to_del])
 
     def post_epoch(self, no_epoch, no_update):
         print("Hidden size: {}".format(self.model.hidden_size))

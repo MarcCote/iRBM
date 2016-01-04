@@ -85,6 +85,7 @@ def build_train_irbm_argparser(subparser):
                        help='number of Gibbs sampling steps in Contrastive Divergence.', default=1)
     model.add_argument('--PCD', action='store_true', help='use Persistent Contrastive Divergence')
     model.add_argument('--shrinkable', action='store_true', help='allows the model to shrink using the heuristic mentioned in the paper.')
+    model.add_argument('--nb-neurons-to-add', type=int, help='nb of hidden units to add when model is growing. Default: 1', default=1)
     model.add_argument('--beta', type=float, help='$\\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
 
     # General parameters (optional)
@@ -207,7 +208,7 @@ def main():
         trainer.add_task(tasks.Print(avg_reconstruction_error, msg="Avg. reconstruction error: {0:.1f}"))
 
         if args.model == 'irbm':
-            trainer.add_task(irbm.GrowiRBM(model, shrinkable=args.shrinkable))
+            trainer.add_task(irbm.GrowiRBM(model, shrinkable=args.shrinkable, nb_neurons_to_add=args.nb_neurons_to_add))
 
         # Save training progression
         trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=100))
