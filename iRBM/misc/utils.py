@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import sys
 import json
 import numpy as np
-import base64
+import itertools
 
 import hashlib
 from time import time
@@ -71,3 +71,43 @@ def logsumexp(x, axis=None, keepdims=False):
         return res[tuple(slices)]
 
     return res
+
+
+def cartesian(sequences, dtype=None):
+    """
+    Generate a cartesian product of input arrays.
+
+    Parameters
+    ----------
+    sequences : list of array-like
+        1-D arrays to form the cartesian product of.
+    dtype : data-type, optional
+        Desired output data-type.
+
+    Returns
+    -------
+    out : ndarray
+        2-D array of shape (M, len(arrays)) containing cartesian products
+        formed of input arrays.
+
+    Examples
+    --------
+    >>> cartesian(([1, 2, 3], [4, 5], [6, 7]))
+    array([[1, 4, 6],
+           [1, 4, 7],
+           [1, 5, 6],
+           [1, 5, 7],
+           [2, 4, 6],
+           [2, 4, 7],
+           [2, 5, 6],
+           [2, 5, 7],
+           [3, 4, 6],
+           [3, 4, 7],
+           [3, 5, 6],
+           [3, 5, 7]])
+
+    """
+    if dtype is None:
+        dtype = np.dtype(type(sequences[0][0]))
+
+    return np.array(list(itertools.product(*sequences)), dtype=dtype)

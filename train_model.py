@@ -211,7 +211,7 @@ def main():
             trainer.add_task(irbm.GrowiRBM(model, shrinkable=args.shrinkable, nb_neurons_to_add=args.nb_neurons_to_add))
 
         # Save training progression
-        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=100))
+        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=50))
         if args.keep is not None:
             trainer.add_task(tasks.KeepProgression(model, experiment_path, each_epoch=args.keep))
 

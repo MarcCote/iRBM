@@ -54,24 +54,9 @@ class oRBM(RBM):
         energies = T.cumsum(energies, axis=1)   # Cumsum over z
         return energies
 
-    def pdf_z_given_v(self, v, method="softmax"):
-        if method == "softmax":
-            log_z_given_v = self.log_z_given_v(v)
-            prob_z_given_v = T.nnet.softmax(log_z_given_v)  # If 2D, softmax is perform along axis=1.
-        elif method == "infinite":
-            log_z_given_v = self.log_z_given_v(v)
-
-            geometric_ratio = T.exp((1.-self.beta) * T.nnet.softplus(0.)).eval()
-            log_shifted_geometric_convergence = np.float32(np.log(geometric_ratio / (1. - geometric_ratio)))
-
-            ### Use this trick until theano.multinomial is fixed. ###
-            # We add the remaining of the geometric series in the last bucket.
-            log_z_given_v = T.set_subtensor(log_z_given_v[:, -1], log_z_given_v[:, -1] + log_shifted_geometric_convergence)
-            log_sum_z_given_v = logsumexp(log_z_given_v, axis=1)
-            ### END ###
-
-            prob_z_given_v = T.exp(log_z_given_v - log_sum_z_given_v[:, None])
-
+    def pdf_z_given_v(self, v):
+        log_z_given_v = self.log_z_given_v(v)
+        prob_z_given_v = T.nnet.softmax(log_z_given_v)  # If 2D, softmax is perform along axis=1.
         return prob_z_given_v
 
     def icdf_z_given_v(self, v):
@@ -141,14 +126,24 @@ class oRBM(RBM):
     def marginalize_over_v_z(self, h):
         # energy = \sum_{i=1}^{|h|} h_i*b_i - \beta * ln(1 + e^{b_i})
 
+        # In theory should use the following line
+        # energy = (h * self.b).T
+        # However, when there is broadcasting, the Theano element-wise multiplication between np.NaN and 0 is 0 instead of np.NaN!
+        # so we use T.tensordot and T.diagonal instead as a workaround!
+        # See Theano issue #3848 (https://github.com/Theano/Theano/issues/3848)
+        energy = T.tensordot(h, self.b, axes=0)
+        energy = T.diagonal(energy, axis1=1, axis2=2).T
+
         if self.penalty == "softplus_bi":
-            energy = (h * self.b).T - self.beta * T.log(1 + T.exp(self.b))[:, None]
+            energy = energy - self.beta * T.log(1 + T.exp(self.b))[:, None]
+
         elif self.penalty == "softplus0":
-            energy = (h * self.b).T - self.beta * T.log(1 + T.exp(0))[:, None]
+            energy = energy - self.beta * T.log(1 + T.exp(0))[:, None]
+
         else:
             raise NameError("Invalid penalty term")
 
-        energy = T.set_subtensor(energy[(T.isnan(energy)).nonzero()], 0)  # Remove
+        energy = T.set_subtensor(energy[(T.isnan(energy)).nonzero()], 0)  # Remove NaN
         energy = T.sum(energy, axis=0, keepdims=True).T
 
         ener = T.tensordot(h, self.W, axes=0)
@@ -160,7 +155,6 @@ class oRBM(RBM):
         return -(energy + ener)
 
     def get_base_rate(self, base_rate_type="uniform"):
-        #raise NotImplementedError("Can't use AIS with oRBM model (WIP).")
         base_rate, annealable_params = RBM.get_base_rate(self, base_rate_type)
         #annealable_params.append(self.beta)  # Seems to work better without annealing self.beta (see unit tests)
 

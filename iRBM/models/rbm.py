@@ -49,15 +49,23 @@ class RBM(Model):
     def marginalize_over_v(self, h):
         return -T.dot(h, self.b) - T.sum(T.nnet.softplus(T.dot(h, self.W) + self.c), axis=1)
 
-    def sample_h_given_v(self, v):
+    def sample_h_given_v(self, v, return_probs=False):
         pre_sigmoid_activation = T.dot(v, self.W.T) + self.b
         h_mean = T.nnet.sigmoid(pre_sigmoid_activation)
+
+        if return_probs:
+            return h_mean
+
         h_sample = self.theano_rng.binomial(size=h_mean.shape, n=1, p=h_mean, dtype=theano.config.floatX)
         return h_sample
 
-    def sample_v_given_h(self, h):
+    def sample_v_given_h(self, h, return_probs=False):
         pre_sigmoid_activation = T.dot(h, self.W) + self.c
         x_mean = T.nnet.sigmoid(pre_sigmoid_activation)
+
+        if return_probs:
+            return x_mean
+
         x_sample = self.theano_rng.binomial(size=x_mean.shape, n=1, p=x_mean, dtype=theano.config.floatX)
         return x_sample
 
@@ -161,6 +169,7 @@ class RBM(Model):
                 lnZ = -self.marginalize_over_v(h=T.zeros((1, self.hidden_size)))
                 lnZ += self.hidden_size * T.log(2)
                 return lnZ[0]
+
         elif base_rate_type == "b":
             base_rate.c = T.zeros_like(self.c)
             annealable_params.append(self.c)

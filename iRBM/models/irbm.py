@@ -4,6 +4,7 @@ from collections import OrderedDict
 import theano
 import theano.tensor as T
 
+from iRBM.models.rbm import RBM
 from iRBM.models.orbm import oRBM
 from iRBM.training import tasks
 
@@ -15,7 +16,7 @@ class iRBM(oRBM):
     """Infinite Restricted Boltzmann Machine (iRBM)  """
     def __init__(self,
                  input_size,
-                 hidden_size,
+                 hidden_size=1,
                  beta=1,
                  max_hidden_size=20000,
                  *args, **kwargs):
@@ -24,13 +25,46 @@ class iRBM(oRBM):
         self.W.set_value(np.zeros_like(self.W.get_value()))
         self.max_hidden_size = max_hidden_size
 
+    def F(self, v, z):
+        energy = -T.dot(v, self.c)
+        energy += -T.sum(T.nnet.softplus(T.dot(v, self.W[:z, :].T) + self.b[:z]), axis=1)
+
+        # Add penality term
+        if self.penalty == "softplus_bi":
+            energy += T.sum(self.beta*T.log(1+T.exp(self.b[:z])))
+        elif self.penalty == "softplus0":
+            energy += T.sum(self.beta*T.log(1+T.exp(0)))
+        else:
+            raise NameError("Invalid penalty term")
+
+        return energy
+
+    def free_energy(self, v):
+        """ Marginalization over hidden units"""
+        free_energy = -T.dot(v, self.c) - logsumexp(self.log_z_given_v(v), axis=1)  # Sum over z'
+        return free_energy
+
     def free_energy_zmask(self, v, zmask):
         """ Marginalization over hidden units"""
         free_energy = -T.dot(v, self.c) - logsumexp(self.log_z_given_v(v)*zmask, axis=1)  # Sum over z'
         return free_energy
 
-    def pdf_z_given_v(self, v, method="infinite"):
-        return oRBM.pdf_z_given_v(self, v, method=method)
+    def log_z_given_v(self, v):
+        log_z_given_v = oRBM.log_z_given_v(self, v)
+
+        geometric_ratio = T.exp((1.-self.beta) * T.nnet.softplus(0.)).eval()
+        #log_shifted_geometric_convergence = np.float32(np.log(geometric_ratio / (1. - geometric_ratio)))
+        log_geometric_convergence = np.float32(np.log(1 / (1. - geometric_ratio)))
+
+        # We add the remaining of the geometric series in the last bucket.
+        log_z_given_v = T.set_subtensor(log_z_given_v[:, -1], log_z_given_v[:, -1] + log_geometric_convergence)
+        return log_z_given_v
+
+    def pdf_z_given_v(self, v):
+        log_z_given_v = self.log_z_given_v(v)
+        log_sum_z_given_v = logsumexp(log_z_given_v, axis=1)
+        prob_z_given_v = T.exp(log_z_given_v - log_sum_z_given_v[:, None])
+        return prob_z_given_v
 
     def get_updates(self, v):
         # Contrastive divergence
@@ -78,6 +112,36 @@ class iRBM(oRBM):
 
         if state['iRBM_version'] >= 2:
             self.max_hidden_size = state['max_hidden_size']
+
+    def get_base_rate(self, base_rate_type="uniform"):
+        base_rate, annealable_params = RBM.get_base_rate(self, base_rate_type)
+        #annealable_params.append(self.beta)  # Seems to work better without annealing self.beta (see unit tests)
+
+        if base_rate_type == "uniform":
+            def compute_lnZ(self):
+                # Since biases and weights are all 0, there are $2^input_size$ different
+                #  visible neuron's states having the following energy
+                #  $\sum_{z=1}^H \sum_{h \in \{0,1\}^z} \exp(-\beta z \ln(2))$
+                r = T.exp((1-self.beta) * T.log(2))  # Ratio of a geometric serie
+                lnZ = T.log(r / (1-r))  # Convergence of the geometric serie
+                return (self.input_size * T.log(2) +  # ln(2^input_size)
+                        lnZ)  # $ln( \sum_{z=1}^H \sum_{h \in \{0,1\}^z} \exp(-\beta z \ln(2)) )$
+
+        elif base_rate_type == "c":
+            def compute_lnZ(self):
+                # Since the hidden biases (but not the visible ones) and the weights are all 0
+                r = T.exp((1-self.beta) * T.log(2))  # Ratio of a geometric serie
+                lnZ = T.log(r / (1-r))  # Convergence of the geometric serie
+                return (lnZ +  # $ln( \sum_{z=1}^H \sum_{h \in \{0,1\}^z} \exp(-\beta z \ln(2)) )$
+                        T.sum(T.nnet.softplus(self.c)))
+
+        elif base_rate_type == "b":
+            raise NotImplementedError()
+
+        import types
+        base_rate.compute_lnZ = types.MethodType(compute_lnZ, base_rate)
+
+        return base_rate, annealable_params
 
 
 class GrowiRBM(tasks.Task):
@@ -148,17 +212,15 @@ class GrowiRBM(tasks.Task):
             model.b.set_value(np.r_[model.b.get_value(), np.zeros(self.nb_neurons_to_add, dtype=theano.config.floatX)])
 
         if self.shrinkable:
-            #raise NotImplementedError
+            # unused_units = np.bitwise_and(np.all(model.W.get_value() == 0., axis=1),
+            #                               model.b.get_value() == 0.)
 
-            #unused_units = np.bitwise_and(np.all(model.W.get_value() == 0., axis=1),
-            #                              model.b.get_value() == 0.)
-            #from ipdb import set_trace as dbg
-            #dbg()
-            #nb_neurons_to_remove = np.diff(np.cumsum(unused_units[::-1]))
+            # if unused_units[-1]:
+            #     nb_neurons_to_del = np.where(np.diff(np.cumsum(unused_units[::-1])) == 0)[0][0] + 1
 
             decrease_needed = np.all(model.W.get_value()[-1] == 0.) and model.b.get_value()[-1] == 0
             if decrease_needed:
-                nb_neurons_to_del = 1
+                nb_neurons_to_del = 1  # Shrink only one at the time.
                 model.hidden_size -= nb_neurons_to_del
                 model.W.set_value(model.W.get_value()[:-nb_neurons_to_del])
                 model.b.set_value(model.b.get_value()[:-nb_neurons_to_del])
