@@ -58,6 +58,9 @@ def buildArgsParser():
     general.add_argument('--view', action='store_true',
                          help='display AIS graph.')
 
+    general.add_argument('--irbm-fixed-size', action='store_true',
+                         help='when evaluating an iRBM consider it is an oRBM, i.e. the number of hidden is now fixed to $l$.')
+
     p.add_argument('-f', '--force', action='store_true', help='Overwrite existing `result.json`')
 
     return p
@@ -102,9 +105,28 @@ def main():
 
         # Load the actual model.
         model = model_class.load(pjoin(experiment_path, "model.pkl"))
-        print "({} hidden units)".format(model.hidden_size)
+
+        if args.irbm_fixed_size:
+            # Use methods from the oRBM.
+            import functools
+            from iRBM.models.orbm import oRBM
+            setattr(model, "get_base_rate", functools.partial(oRBM.get_base_rate, model))
+            setattr(model, "pdf_z_given_v", functools.partial(oRBM.pdf_z_given_v, model))
+            setattr(model, "log_z_given_v", functools.partial(oRBM.log_z_given_v, model))
+            setattr(model, "free_energy", functools.partial(oRBM.free_energy, model))
+            print "({} with {} fixed hidden units)".format(hyperparams["model"], model.hidden_size)
+
+        else:
+            print "({} with {} hidden units)".format(hyperparams["model"], model.hidden_size)
 
     # Result files.
+    if args.irbm_fixed_size:
+        experiment_path = pjoin(experiment_path, "irbm_fixed_size")
+        try:
+            os.makedirs(experiment_path)
+        except:
+            pass
+
     ais_result_file = pjoin(experiment_path, "ais_result.json")
     result_file = pjoin(experiment_path, "result.json")
 
@@ -113,7 +135,8 @@ def main():
     else:
         if not os.path.isfile(ais_result_file) or args.force:
             with Timer("Estimating model's partition function with AIS({0}) and {1} temperatures.".format(args.nb_samples, args.nb_temperatures)):
-                ais_results = compute_AIS(model, M=args.nb_samples, betas=np.linspace(0, 1, args.nb_temperatures), seed=args.seed, experiment_path=experiment_path, force=args.force)
+                ais_results = compute_AIS(model, M=args.nb_samples, betas=np.linspace(0, 1, args.nb_temperatures), seed=args.seed, ais_working_dir=experiment_path, force=args.force)
+                ais_results["irbm_fixed_size"] = args.irbm_fixed_size
                 utils.save_dict_to_json_file(ais_result_file, ais_results)
         else:
             print "Loading previous AIS results... (use --force to re-run AIS)"
@@ -130,6 +153,10 @@ def main():
 
             if ais_results['seed'] != args.seed:
                 print "The seed specified ({}) doesn't match the one found in ais_results.json ({}). Aborting.".format(args.seed, ais_results['seed'])
+                sys.exit(-1)
+
+            if ais_results.get('irbm_fixed_size', False) != args.irbm_fixed_size:
+                print "The option '--irbm-fixed' specified ({}) doesn't match the one found in ais_results.json ({}). Aborting.".format(args.irbm_fixed_size, ais_results['irbm_fixed_size'])
                 sys.exit(-1)
 
         lnZ = ais_results['logcummean_Z'][-1]
@@ -155,6 +182,7 @@ def main():
                   'trainset': [float(NLL_train.avg), float(NLL_train.stderr)],
                   'validset': [float(NLL_valid.avg), float(NLL_valid.stderr)],
                   'testset': [float(NLL_test.avg), float(NLL_test.stderr)],
+                  'irbm_fixed_size': args.irbm_fixed_size,
                   }
         utils.save_dict_to_json_file(result_file, result)
 

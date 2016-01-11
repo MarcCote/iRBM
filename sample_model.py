@@ -33,6 +33,9 @@ def buildArgsParser():
     sampling.add_argument('--cdk', metavar='K', type=int,
                           help='number of Gibbs steps. Default=10000', default=10000)
 
+    sampling.add_argument('--full-gibbs-step', action='store_true',
+                          help='if specified, use heuristic z=K for the first Gibbs step.')
+
     sampling.add_argument('--seed', type=int,
                           help='seed used to generate random numbers. Default=1234.', default=1234)
 
@@ -98,6 +101,14 @@ def main():
         v0 = theano.shared(np.asarray(chain_start, dtype=theano.config.floatX))
         v1 = model.gibbs_step(v0)
         gibbs_step = theano.function([], updates={v0: v1})
+
+        if args.full_gibbs_step:
+            print "Using z=K"
+            # Use z=K for first Gibbs step.
+            from iRBM.models.rbm import RBM
+            h0 = RBM.sample_h_given_v(model, v0)
+            v1 = RBM.sample_v_given_h(model, h0)
+            v0.set_value(v1.eval())
 
     with Timer("Sampling"):
         for k in range(args.cdk):

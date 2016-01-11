@@ -90,8 +90,8 @@ def _compute_AIS_samples(model, M=100, betas=BETAS):
             "lnZ_trivial": lnZ_trivial}
 
 
-def _compute_AIS(model, M=100, betas=BETAS, batch_size=None, seed=1234, experiment_path=".", force=False):
-    ais_results_json = pjoin(experiment_path, "ais_results.part.json")
+def _compute_AIS(model, M=100, betas=BETAS, batch_size=None, seed=1234, ais_working_dir=".", force=False):
+    ais_results_json = pjoin(ais_working_dir, "ais_results.part.json")
 
     if batch_size is None:
         batch_size = M
@@ -174,13 +174,13 @@ def _compute_AIS(model, M=100, betas=BETAS, batch_size=None, seed=1234, experime
             }
 
 
-def compute_AIS(model, M=100, betas=BETAS, seed=1234, experiment_path=".", force=False):
+def compute_AIS(model, M=100, betas=BETAS, seed=1234, ais_working_dir=".", force=False):
     # Try different size of batch size.
     batch_size = M
     while batch_size >= 1:
         "Computing AIS using batch size of {}".format(batch_size)
         try:
-            return _compute_AIS(model, M=M, betas=betas, batch_size=int(batch_size), seed=seed, experiment_path=experiment_path, force=force)
+            return _compute_AIS(model, M=M, betas=betas, batch_size=int(batch_size), seed=seed, ais_working_dir=ais_working_dir, force=force)
         except MemoryError as e:
             print e
             # Probably not enough memory on GPU

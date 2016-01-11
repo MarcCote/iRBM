@@ -56,6 +56,7 @@ def main():
 
     sort_by = args.sort
 
+    names = []
     results_files = []
     hyperparams_files = []
     status_files = []
@@ -79,6 +80,12 @@ def main():
         if not os.path.isfile(status_file):
             print 'Skip: {0} is not a file!'.format(status_file)
             continue
+
+        name = os.path.basename(exp_folder)
+        if 'hyperparams.json' in os.listdir(os.path.abspath(pjoin(exp_folder, os.path.pardir))):
+            name = os.path.basename(os.path.abspath(pjoin(exp_folder, os.path.pardir)))
+
+        names.append(name)
 
         results_files.append(result_file)
         hyperparams_files.append(hyperparams_file)
@@ -106,7 +113,7 @@ def main():
     #       'trainset' and 'trainset_std' (same goes for validset and testset).
     headers_results |= set(["trainset_std", "validset_std", "testset_std"])
     headers_results = sorted(list(headers_results))
-    headers = headers_hyperparams + headers_status + headers_results
+    headers = headers_hyperparams + headers_status + ["name"] + headers_results
 
     # Build results table
     table = Texttable(max_width=0)
@@ -123,7 +130,7 @@ def main():
         return
 
     # Results
-    for hyperparams_file, status_file, results_file in zip(hyperparams_files, status_files, results_files):
+    for name, hyperparams_file, status_file, results_file in zip(names, hyperparams_files, status_files, results_files):
         hyperparams = load_dict_from_json_file(hyperparams_file)
         results = load_dict_from_json_file(results_file)
         status = load_dict_from_json_file(status_file)
@@ -137,6 +144,8 @@ def main():
         for h in headers_status:
             value = status.get(h, '')
             row.append(value)
+
+        row.append(name)
 
         for h in headers_results:
             if h in ["trainset", "validset", "testset"]:
