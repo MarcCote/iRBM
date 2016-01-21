@@ -145,10 +145,11 @@ class iRBM(oRBM):
 
 
 class GrowiRBM(tasks.Task):
-    def __init__(self, model, shrinkable=False, nb_neurons_to_add=1):
+    def __init__(self, model, shrinkable=False, nb_neurons_to_add=1, random_init=False):
         super(GrowiRBM, self).__init__()
         self.model = model
         self.shrinkable = shrinkable
+        self.random_init = random_init
         self.nb_neurons_to_add = nb_neurons_to_add
         self.maxZ = theano.shared(np.array(0, dtype="int64"))
         self.grad_W_new_neurons = theano.shared(np.zeros((nb_neurons_to_add, model.input_size), dtype=theano.config.floatX))
@@ -160,10 +161,18 @@ class GrowiRBM(tasks.Task):
         max_Zs = T.maximum(z_start, z_end)
         maxZ = max_Zs.max()
 
+        W_init = T.zeros((nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)
+        b_init = T.zeros(nb_neurons_to_add, dtype=theano.config.floatX)
+
+        if self.random_init:
+            from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+            trng = RandomStreams(42)
+            W_init = 1e-2 * trng.normal((nb_neurons_to_add, model.input_size), dtype=theano.config.floatX)
+
         W_bak = model.W
         b_bak = model.b
-        model.W = T.join(0, model.W, T.zeros((nb_neurons_to_add, model.input_size), dtype=theano.config.floatX))
-        model.b = T.join(0, model.b, T.zeros(nb_neurons_to_add, dtype=theano.config.floatX))
+        model.W = T.join(0, model.W, W_init)
+        model.b = T.join(0, model.b, b_init)
         cost = model.free_energy(model.CD.chain_start) - model.free_energy(model.CD.chain_end)
         grad_W_new_neurons = theano.grad(T.mean(cost), model.W)[-nb_neurons_to_add:]
         model.W = W_bak

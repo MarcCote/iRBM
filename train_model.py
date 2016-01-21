@@ -84,9 +84,10 @@ def build_train_irbm_argparser(subparser):
     model.add_argument('--cdk', metavar='K', type=int,
                        help='number of Gibbs sampling steps in Contrastive Divergence.', default=1)
     model.add_argument('--PCD', action='store_true', help='use Persistent Contrastive Divergence')
+    model.add_argument('--beta', type=float, help='$\\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
     model.add_argument('--shrinkable', action='store_true', help='allows the model to shrink using the heuristic mentioned in the paper.')
     model.add_argument('--nb-neurons-to-add', type=int, help='nb of hidden units to add when model is growing. Default: 1', default=1)
-    model.add_argument('--beta', type=float, help='$\\beta$ hyperparameter in penalty term (see paper). Default=1.01', default=1.01)
+    # model.add_argument('--random-init', action='store_true', help='if specified, added hidden units weights will be randomly initialized (hack to help breaking symmetry).')
 
     # General parameters (optional)
     general = p.add_argument_group("General arguments")
@@ -170,6 +171,8 @@ def main():
         # Check if provided hyperparams match those in the experiment folder
         hyperparams_loaded = utils.load_dict_from_json_file(pjoin(experiment_path, "hyperparams.json"))
         if hyperparams != hyperparams_loaded:
+            print "{\n" + "\n".join(["{}: {}".format(k, hyperparams[k]) for k in sorted(hyperparams.keys())]) + "\n}"
+            print "{\n" + "\n".join(["{}: {}".format(k, hyperparams_loaded[k]) for k in sorted(hyperparams_loaded.keys())]) + "\n}"
             print "The arguments provided are different than the one saved. Use --force if you are certain.\nQuitting."
             exit(1)
     else:
@@ -208,10 +211,10 @@ def main():
         trainer.add_task(tasks.Print(avg_reconstruction_error, msg="Avg. reconstruction error: {0:.1f}"))
 
         if args.model == 'irbm':
-            trainer.add_task(irbm.GrowiRBM(model, shrinkable=args.shrinkable, nb_neurons_to_add=args.nb_neurons_to_add))
+            trainer.add_task(irbm.GrowiRBM(model, shrinkable=args.shrinkable, nb_neurons_to_add=args.nb_neurons_to_add))  #, random_init=args.random_init))
 
         # Save training progression
-        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=50))
+        trainer.add_task(tasks.SaveProgression(model, experiment_path, each_epoch=1))
         if args.keep is not None:
             trainer.add_task(tasks.KeepProgression(model, experiment_path, each_epoch=args.keep))
 
