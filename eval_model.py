@@ -134,14 +134,14 @@ def main():
         lnZ, lnZ_down, lnZ_up = args.lnZ
     else:
         if not os.path.isfile(ais_result_file) or args.force:
-            with Timer("Estimating model's partition function with AIS({0}) and {1} temperatures.".format(args.nb_samples, args.nb_temperatures)):
+            with Timer("Estimating model's partition function with AIS({0}) and {1:,} temperatures.".format(args.nb_samples, args.nb_temperatures)):
                 ais_results = compute_AIS(model, M=args.nb_samples, betas=np.linspace(0, 1, args.nb_temperatures), seed=args.seed, ais_working_dir=experiment_path, force=args.force)
                 ais_results["irbm_fixed_size"] = args.irbm_fixed_size
                 utils.save_dict_to_json_file(ais_result_file, ais_results)
         else:
             print "Loading previous AIS results... (use --force to re-run AIS)"
             ais_results = utils.load_dict_from_json_file(ais_result_file)
-            print "AIS({0}) with {1} temperatures".format(ais_results['nb_samples'], ais_results['nb_temperatures'])
+            print "AIS({0}) with {1:,} temperatures".format(ais_results['nb_samples'], ais_results['nb_temperatures'])
 
             if ais_results['nb_samples'] != args.nb_samples:
                 print "The number of samples specified ({:,}) doesn't match the one found in ais_results.json ({:,}). Aborting.".format(args.nb_samples, ais_results['nb_samples'])
@@ -173,6 +173,11 @@ def main():
     print "Avg. NLL on trainset: {:.2f} ± {:.2f}".format(NLL_train.avg, NLL_train.stderr)
     print "Avg. NLL on validset: {:.2f} ± {:.2f}".format(NLL_valid.avg, NLL_valid.stderr)
     print "Avg. NLL on testset:  {:.2f} ± {:.2f}".format(NLL_test.avg, NLL_test.stderr)
+    print "---"
+    Fv_rnd = model.free_energy(np.random.rand(*ais_results['last_sample_chain'].shape)).eval()
+    print "Avg. F(v) on {:,} random samples: {:.2f} ± {:.2f}".format(args.nb_samples, Fv_rnd.mean(), Fv_rnd.std())
+    Fv_model = model.free_energy(ais_results['last_sample_chain']).eval()
+    print "Avg. F(v) on {:,} AIS samples:    {:.2f} ± {:.2f}".format(args.nb_samples, Fv_model.mean(), Fv_model.std())
 
     # Save results JSON file.
     if args.lnZ is None:

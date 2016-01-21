@@ -297,8 +297,8 @@ class TestAIS_oRBM(unittest.TestCase):
         start = time.time()
 
         try:
-            experiment_path = tempfile.mkdtemp()
-            result = compute_AIS(model, M=self.nb_samples, betas=self.betas, seed=1234, experiment_path=experiment_path, force=True)
+            ais_working_dir = tempfile.mkdtemp()
+            result = compute_AIS(model, M=self.nb_samples, betas=self.betas, seed=1234, ais_working_dir=ais_working_dir, force=True)
             logcummean_Z, logcumstd_Z_down, logcumstd_Z_up = result['logcummean_Z'], result['logcumstd_Z_down'], result['logcumstd_Z_up']
             std_lnZ = result['std_lnZ']
 
@@ -320,7 +320,7 @@ class TestAIS_oRBM(unittest.TestCase):
             print np.abs(AIS_logZ - f_brute_force_lnZ())
             assert_almost_equal(AIS_logZ, f_brute_force_lnZ(), decimal=2)
         finally:
-            shutil.rmtree(experiment_path)
+            shutil.rmtree(ais_working_dir)
 
 
 if __name__ == '__main__':

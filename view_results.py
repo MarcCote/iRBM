@@ -81,9 +81,11 @@ def main():
             print 'Skip: {0} is not a file!'.format(status_file)
             continue
 
-        name = os.path.basename(exp_folder)
-        if 'hyperparams.json' in os.listdir(os.path.abspath(pjoin(exp_folder, os.path.pardir))):
-            name = os.path.basename(os.path.abspath(pjoin(exp_folder, os.path.pardir)))
+        name = os.path.abspath(exp_folder)
+        while 'hyperparams.json' in os.listdir(os.path.abspath(pjoin(name, os.path.pardir))):
+            name = os.path.abspath(pjoin(name, os.path.pardir))
+
+        name = os.path.basename(name)
 
         names.append(name)
 
