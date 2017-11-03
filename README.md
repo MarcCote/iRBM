@@ -8,6 +8,7 @@ Paper on [arxiv](http://arxiv.org/abs/1502.02476) and at [ICML2015 - Deep Learni
 - numpy >= 1.7
 - scipy >= 0.11
 - theano >= 0.6
+- texttable
 
 ## Usage
 Experiments are saved in : *`./experiments/{experiment_name}/`*.
