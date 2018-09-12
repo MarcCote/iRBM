@@ -10,7 +10,7 @@ import theano
 import theano.tensor as T
 from theano import config
 
-import utils
+from iRBM.misc import utils
 
 
 BETAS = np.r_[np.linspace(0, 0.5, num=500), np.linspace(0.5, 0.9, num=4000), np.linspace(0.9, 1, num=10000)]
